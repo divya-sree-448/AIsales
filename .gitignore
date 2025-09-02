@@ -1,0 +1,10 @@
+# Ignore everything
+*
+
+# Allow only these files
+!.gitignore
+!config.py
+!google_sheets.py
+!main.py
+!sentiment.py
+!speech_to_text.py
