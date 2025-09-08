@@ -8,3 +8,5 @@
 !main.py
 !sentiment.py
 !speech_to_text.py
+!app_streamlit.py
+!.streamlit/
