@@ -10,3 +10,4 @@
 !speech_to_text.py
 !app_streamlit.py
 !.streamlit/
+!.streamlit/config.toml
