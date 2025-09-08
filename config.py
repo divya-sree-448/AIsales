@@ -17,3 +17,5 @@ scope = ["https://spreadsheets.google.com/feeds","https://www.googleapis.com/aut
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client_gs = gspread.authorize(creds)
 sheet = client_gs.open("AI Sales Call Assistant").sheet1
+
+
