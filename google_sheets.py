@@ -1,21 +1,3 @@
-# import csv
-# import os
-# import datetime
-# from config import sheet, CSV_FILE
-
-# def save_to_sheets(timestamp, text, sentiment, emotion, stop_reason):
-#     sheet.append_row([timestamp, text, sentiment, emotion, stop_reason])
-
-# def save_to_csv(text, sentiment_result, emotion_result, stop_reason):
-#     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#     file_exists = os.path.isfile(CSV_FILE)
-#     with open(CSV_FILE, "a", newline="", encoding="utf-8") as csvfile:
-#         writer = csv.writer(csvfile)
-#         if not file_exists:
-#             writer.writerow(["Timestamp", "Transcript", "Sentiment", "Emotion", "StopReason"])
-#         writer.writerow([timestamp, text, sentiment_result, emotion_result, stop_reason])
-#     return timestamp
-
 import csv
 import os
 import datetime
