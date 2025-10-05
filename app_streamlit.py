@@ -8,9 +8,10 @@ from datetime import datetime
 from speech_to_text import calibrate_silence, record_until_silence
 from sentiment import analyze_audio
 from google_sheets import ensure_headers, save_to_sheets
+from config import client as groq_client, sheet
 from config import SAMPLE_RATE, CHANNELS, SILENCE_LIMIT, sheet, client
 
-# ---------------- Page Setup ----------------
+# ---------------- PAGE SETUP ----------------
 st.set_page_config(page_title="AI Speech Analysis Studio", page_icon="🎙️", layout="wide")
 
 # ---------------- CSS ----------------
@@ -18,91 +19,35 @@ st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
-
-/* 🧭 Remove extra top space */
-div.block-container {
-    padding-top: 3rem !important;  /* reduced from 6rem */
-    padding-bottom: 1rem;
-}
-
-/* 🏷 Title + Subtitle */
-.app-title { 
-    font-size: 36px; 
-    font-weight: 800; 
-    color: #111827; 
-    margin-bottom: 4px;
-    margin-top: 0px; /* remove extra margin */
-}
-.app-subtitle { 
-    color: #6B7280; 
-    margin-bottom: 20px;
-    margin-top: 0px;
-}
-
-/* 🧭 Navigation Bar */
-.navbar { 
-    display: inline-flex; 
-    gap: 8px; 
-    padding: 6px; 
-    background: #fff; 
-    border-radius: 14px; 
-    box-shadow: 0 6px 16px rgba(17,24,39,.08); 
-    margin-top: 8px; 
-    margin-bottom: 18px; 
-}
-.navbtn { 
-    padding: 8px 14px; 
-    border-radius: 10px; 
-    border: 1px solid #E5E7EB; 
-    background: #fff; 
-    color: #111827; 
-    font-weight: 600; 
-}
-.navbtn.active { 
-    background: #111827; 
-    color: #fff; 
-    border-color: #111827; 
-}
-
-/* 💳 Card Styles */
-.card { 
-    background: #fff; 
-    border: 1px solid #E5E7EB; 
-    border-radius: 16px; 
-    padding: 18px; 
-    box-shadow: 0 8px 20px rgba(17,24,39,.05); 
-}
-
-/* 🏷 Badges */
+div.block-container { padding-top: 2rem !important; }
+.app-title { font-size: 36px; font-weight: 800; color: #111827; margin-bottom: 4px;}
+.app-subtitle { color: #6B7280; margin-bottom: 20px; }
+.navbar { display: inline-flex; gap: 8px; padding: 6px; background: #fff; border-radius: 14px; 
+          box-shadow: 0 6px 16px rgba(17,24,39,.08); margin-top: 8px; margin-bottom: 10px; }
+.navbtn { padding: 8px 14px; border-radius: 10px; border: 1px solid #E5E7EB; background: #fff; 
+          color: #111827; font-weight: 600; }
+.navbtn.active { background: #111827; color: #fff; border-color: #111827; }
+.card { background: #fff; border: 1px solid #E5E7EB; border-radius: 16px; padding: 18px; 
+        box-shadow: 0 8px 20px rgba(17,24,39,.05); }
 .badge { display: inline-block; padding: 6px 10px; border-radius: 999px; font-weight: 700; font-size: 13px; }
 .badge.pos { color:#065F46; background:#D1FAE5; }
 .badge.neg { color:#991B1B; background:#FEE2E2; }
 .badge.neu { color:#374151; background:#E5E7EB; }
 .badge.emo { color:#111827; background:#EDE9FE; }
-
-/* 🧾 Transcript */
-.transcript { 
-    border: 1px solid #E5E7EB; 
-    background: #F9FAFB; 
-    border-radius: 12px; 
-    padding: 12px; 
-    min-height: 140px; 
-    color:#111827; 
-}
-
+.transcript { border: 1px solid #E5E7EB; background: #F9FAFB; border-radius: 12px; padding: 12px; 
+              min-height: 140px; color:#111827; }
 .small { color:#6B7280; font-size: 13px; }
 .placeholder { color:#9CA3AF; font-style: italic; }
 </style>
 """, unsafe_allow_html=True)
 
-
-# ---------------- Header ----------------
+# ---------------- HEADER ----------------
 st.markdown('<div class="app-title">🎙️ AI Speech Analysis Studio</div>', unsafe_allow_html=True)
 st.markdown('<div class="app-subtitle">Real-time Speech-to-Text with Sentiment & Emotion Analysis</div>', unsafe_allow_html=True)
 
-# ---------------- Tabs ----------------
+# ---------------- TABS ----------------
 tab = st.session_state.get("tab", "Record")
-c1, c2, c3, c4 = st.columns([1,1,1,1])
+c1, c2, c3, c4, c5 = st.columns([1, 1, 1, 1, 1])
 with c1:
     if st.button("Record", key="nav_record"): tab = "Record"
 with c2:
@@ -111,6 +56,8 @@ with c3:
     if st.button("Analytics", key="nav_analytics"): tab = "Analytics"
 with c4:
     if st.button("Purchasing History", key="nav_purchasing"): tab = "Purchasing History"
+with c5:
+    if st.button("Agent Summary", key="nav_agent"): tab = "Agent Summary"
 st.session_state["tab"] = tab
 
 st.markdown(
@@ -120,11 +67,11 @@ st.markdown(
       <span class="{'navbtn active' if tab=='History' else 'navbtn'}">History</span>
       <span class="{'navbtn active' if tab=='Analytics' else 'navbtn'}">Analytics</span>
       <span class="{'navbtn active' if tab=='Purchasing History' else 'navbtn'}">Purchasing History</span>
+      <span class="{'navbtn active' if tab=='Agent Summary' else 'navbtn'}">Agent Summary</span>
     </div>
     """,
     unsafe_allow_html=True
 )
-
 # ---------------- Helpers ----------------
 def _background_capture(threshold, holder, stop_event):
     audio_list, stop_reason = record_until_silence(threshold, stop_event=stop_event)
@@ -301,6 +248,7 @@ def save_summary_row(timestamp: str,
         ]
 
     ws.append_row(row)
+
 
 
 # ---- Sheet Helpers ----
@@ -794,10 +742,8 @@ if tab == "Analytics":
         st.error(f"Analytics error: {e}")
     st.markdown('</div>', unsafe_allow_html=True)
 
-
 # ---------------- PURCHASING HISTORY TAB ----------------
-
-if tab == "Purchasing History":
+elif tab == "Purchasing History":
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.subheader("🛒 Purchasing History")
 
@@ -830,12 +776,22 @@ if tab == "Purchasing History":
                 for m in matched:
                     if "ProductPrice" in m and m["ProductPrice"]:
                         try:
-                            total_spend += sum([float(x) for x in m["ProductPrice"].split(",") if x.strip().replace('.', '', 1).isdigit()])
+                            total_spend += sum([
+                                float(x)
+                                for x in m["ProductPrice"].split(",")
+                                if x.strip().replace('.', '', 1).isdigit()
+                            ])
                         except:
                             pass
                 st.metric("Total Spend", f"${total_spend:,.2f}")
 
-                st.dataframe(matched, use_container_width=True, height=350)
+                # ✅ Convert to DataFrame and remove Summary + ActionItems
+                df_display = pd.DataFrame(matched)
+                cols_to_drop = [c for c in ["Summary", "ActionItems"] if c in df_display.columns]
+                df_display = df_display.drop(columns=cols_to_drop)
+
+                # 📊 Show cleaned table
+                st.dataframe(df_display, use_container_width=True, height=350)
             else:
                 st.info("No purchase history found for this customer.")
 
@@ -900,7 +856,7 @@ if tab == "Purchasing History":
                         ]
                         """
                         resp = client.chat.completions.create(
-                            model="llama-3.1-8b-instant",
+                            model="llama-3.3-70b-versatile",
                             messages=[
                                 {"role": "system", "content": "You are a helpful sales assistant."},
                                 {"role": "user", "content": prompt}
@@ -952,17 +908,150 @@ if tab == "Purchasing History":
 
     st.markdown('</div>', unsafe_allow_html=True)
 
+# ---------------- AGENT SUMMARY TAB ----------------
+elif tab == "Agent Summary":
+    import textwrap
+    from groq import Groq
 
+    # 🧠 Auto logout if user switches tab
+    if "last_tab" in st.session_state and st.session_state["last_tab"] != tab:
+        if st.session_state["last_tab"] == "Agent Summary":
+            st.session_state["agent_logged_in"] = False  # logout only when leaving agent tab
+    st.session_state["last_tab"] = tab
 
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.subheader("🧠 Post-Call Summaries (Agent Only)")
+    st.caption("Private view for agents. Enter customer phone number to view their summaries.")
 
+    # ✅ Simple agent login
+    if not st.session_state.get("agent_logged_in", False):
+        with st.form("login_form"):
+            username = st.text_input("👤 Agent Username")
+            password = st.text_input("🔑 Password", type="password")
+            submit_login = st.form_submit_button("Login")
 
+            if submit_login:
+                if username == "agent" and password == "1234":
+                    st.session_state["agent_logged_in"] = True
+                    st.success("✅ Logged in successfully!")
+                    time.sleep(1)
+                    st.rerun()
+                else:
+                    st.error("❌ Invalid credentials")
+        st.stop()
+    else:
+        st.success("Welcome Agent 👋")
 
+    # 🚪 Manual Logout
+    if st.button("🚪 Logout"):
+        st.session_state["agent_logged_in"] = False
+        st.rerun()
 
+    # 🔍 Input for phone number
+    customer_filter = st.text_input("📞 Enter Customer Phone Number")
 
+    if not customer_filter.strip():
+        st.info("Enter phone number to view summaries.")
+        st.stop()
 
+    try:
+        # ✅ Load data from Summaries sheet
+        ws = ensure_summaries_ready()
+        values = ws.get_all_values()
+        if not values or len(values) < 2:
+            st.warning("No data found in Summaries sheet.")
+            st.stop()
 
+        headers = values[0]
+        rows = values[1:]
+        df = pd.DataFrame(rows, columns=headers)
 
+        if "CustomerPhone" not in df.columns:
+            st.error("❌ 'CustomerPhone' column not found in sheet.")
+            st.stop()
 
+        # 🔍 Filter by phone
+        mask = df["CustomerPhone"].astype(str).str.contains(customer_filter, case=False, na=False, regex=False)
+        filtered = df[mask]
+
+        if filtered.empty:
+            st.warning(f"No summaries found for **{customer_filter}**.")
+        else:
+            st.info(f"📋 Showing {len(filtered)} summaries for **{customer_filter}**")
+
+            # 🧠 Collect all summaries
+            all_summaries_text = ""
+            for _, row in filtered.iterrows():
+                st.markdown(
+                    f"""
+                    <div style="
+                        background:#fff;
+                        border:1px solid #E5E7EB;
+                        border-radius:14px;
+                        padding:16px 20px;
+                        margin-bottom:14px;
+                        box-shadow:0 4px 10px rgba(0,0,0,0.05);
+                    ">
+                        <h4 style="margin:0; color:#111827;">🕒 {row.get('Timestamp', '')}</h4>
+                        <p style="color:#6B7280; margin:2px 0 8px;">📞 <b>{row.get('CustomerPhone','NA')}</b></p>
+                        <p><b>📝 Summary:</b> {row.get('Summary','')}</p>
+                        <p><b>🎯 Action Items:</b> {row.get('ActionItems','')}</p>
+                        <p><b>😃 Sentiment:</b> {row.get('Sentiment','N/A')}</p>
+                        <p><b>💭 Emotion:</b> {row.get('Emotion','N/A')}</p>
+                        <p><b>🧩 Recommended Products:</b> {row.get('RecommendedProducts','N/A')}</p>
+                        <p><b>💰 Prices:</b> {row.get('ProductPrice','N/A')}</p>
+                        <p style="color:#6B7280;">📅 Purchase Date: {row.get('PurchaseDate','')}</p>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
+                )
+
+                all_summaries_text += f"Summary: {row.get('Summary','')}\nAction Items: {row.get('ActionItems','')}\n\n"
+
+            # 🧠 AI Summary Button
+            if st.button("🤖 Generate AI Summary"):
+                try:
+                    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+                    with st.spinner("Generating AI summary... ⏳"):
+                        prompt = f"""
+                        You are an assistant summarizing multiple call summaries into a structured post-call report.
+                        Combine all details below into formatted sections:
+                        💬 Overall Sentiment**
+                        🎯 Customer Intent
+                        🧩 Key Topics
+                        ⚠️ Objections
+                        ✅ Resolutions
+                        📝 Next Steps
+                        🔁 Recommended Follow-up
+
+                        Input Summaries:
+                        {all_summaries_text}
+                        """
+
+                        response = client.chat.completions.create(
+                            model="llama-3.3-70b-versatile",
+                            messages=[{"role": "user", "content": prompt}],
+                        )
+
+                        ai_summary = response.choices[0].message.content.strip()
+
+                    st.success("✅ AI Summary Generated")
+                    st.markdown(
+                        f"""
+                        <div style="background:#F9FAFB; border:1px solid #E5E7EB; border-radius:10px; padding:16px;">
+                        {ai_summary.replace("\n", "<br>")}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                except Exception as e:
+                    st.error(f"AI Summary generation failed: {e}")
+
+    except Exception as e:
+        st.error(f"⚠️ Error loading summaries: {e}")
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 
